@@ -134,8 +134,10 @@ def run_client():
             assert link['mediaType'] == 'text/html'
             assert link['href'] == _PATH_PREFIX
         else:
-            assert link['href'] == '{}://{}{}'.format(
-                'wss' if _PROTO == 'https' else 'ws', _BASE_URL, _PATH_PREFIX)
+            proto = 'wss' if _PROTO == 'https' else 'ws'
+            assert re.match(
+                proto + r'://\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{2,5}' + _PATH_PREFIX,
+                link['href'])
             ws_href = link['href']
 
     # Test properties
