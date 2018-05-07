@@ -15,6 +15,7 @@ _PROTO = None
 _BASE_URL = None
 _PATH_PREFIX = None
 _AUTHORIZATION_HEADER = None
+_DEBUG = False
 
 
 def get_ip():
@@ -51,6 +52,12 @@ def http_request(method, path, data=None):
         'Accept': 'application/json',
     }
 
+    if _DEBUG:
+        if data is None:
+            print('Request:  {} {}'.format(method, url))
+        else:
+            print('Request:  {} {}\n          '.format(method, url, data))
+
     if _AUTHORIZATION_HEADER is not None:
         headers['Authorization'] = _AUTHORIZATION_HEADER
 
@@ -72,8 +79,15 @@ def http_request(method, path, data=None):
     response = client.fetch(request, raise_error=False)
 
     if response.body:
+        if _DEBUG:
+            print('Response: {} {}\n'
+                  .format(response.code, response.body.decode()))
+
         return response.code, json.loads(response.body.decode())
     else:
+        if _DEBUG:
+            print('Response: {}\n'.format(response.code))
+
         return response.code, None
 
 
@@ -372,6 +386,9 @@ if __name__ == '__main__':
                         default='')
     parser.add_argument('--auth-header',
                         help='authorization header, i.e. "Bearer ..."')
+    parser.add_argument('--debug',
+                        help='log all requests',
+                        action='store_true')
     args = parser.parse_args()
 
     if (args.protocol == 'http' and args.port == 80) or \
@@ -379,6 +396,9 @@ if __name__ == '__main__':
         _BASE_URL = args.host
     else:
         _BASE_URL = '{}:{}'.format(args.host, args.port)
+
+    if args.debug:
+        _DEBUG = True
 
     _PROTO = args.protocol
     _PATH_PREFIX = args.path_prefix
