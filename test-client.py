@@ -72,7 +72,7 @@ def http_request(method, path, data=None):
     response = client.fetch(request, raise_error=False)
 
     if response.body:
-        return response.code, json.loads(response.body)
+        return response.code, json.loads(response.body.decode())
     else:
         return response.code, None
 

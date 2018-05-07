@@ -1,2 +1,2 @@
 tornado
-websocket
+websocket-client
