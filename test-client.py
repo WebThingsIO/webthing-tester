@@ -158,12 +158,15 @@ def run_client():
             assert link['href'] == _PATH_PREFIX
         else:
             proto = 'wss' if _PROTO == 'https' else 'ws'
-            assert re.match(
-                proto + r'://\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{2,5}' + _PATH_PREFIX,
-                link['href'])
+            assert re.match(proto + r'://[^/]+' + _PATH_PREFIX, link['href'])
             ws_href = link['href']
 
     # Test properties
+    code, body = http_request('GET', '/properties')
+    assert code == 200
+    assert body['brightness'] == 50
+    assert body['on']
+
     code, body = http_request('GET', '/properties/brightness')
     assert code == 200
     assert body['brightness'] == 50
@@ -218,6 +221,17 @@ def run_client():
     assert re.match(_TIME_REGEX, body[0]['fade']['timeCompleted']) is not None
     assert body[0]['fade']['status'] == 'completed'
 
+    code, body = http_request('GET', '/actions/fade')
+    assert code == 200
+    assert len(body) == 1
+    assert len(body[0].keys()) == 1
+    assert body[0]['fade']['input']['brightness'] == 50
+    assert body[0]['fade']['input']['duration'] == 2000
+    assert body[0]['fade']['href'] == _PATH_PREFIX + '/actions/fade/' + action_id
+    assert re.match(_TIME_REGEX, body[0]['fade']['timeRequested']) is not None
+    assert re.match(_TIME_REGEX, body[0]['fade']['timeCompleted']) is not None
+    assert body[0]['fade']['status'] == 'completed'
+
     code, body = http_request('DELETE', '/actions/fade/' + action_id)
     assert code == 204
     assert body is None
@@ -229,6 +243,60 @@ def run_client():
     assert len(body[0].keys()) == 1
     assert body[0]['overheated']['data'] == 102
     assert re.match(_TIME_REGEX, body[0]['overheated']['timestamp']) is not None
+
+    code, body = http_request('GET', '/events/overheated')
+    assert code == 200
+    assert len(body) == 1
+    assert len(body[0].keys()) == 1
+    assert body[0]['overheated']['data'] == 102
+    assert re.match(_TIME_REGEX, body[0]['overheated']['timestamp']) is not None
+
+    code, body = http_request(
+        'POST',
+        '/actions/fade',
+        {
+            'fade': {
+                'input': {
+                    'brightness': 50,
+                    'duration': 2000,
+                },
+            },
+        })
+    assert code == 201
+    assert body['fade']['input']['brightness'] == 50
+    assert body['fade']['input']['duration'] == 2000
+    assert body['fade']['href'].startswith(_PATH_PREFIX + '/actions/fade/')
+    assert body['fade']['status'] == 'created'
+    action_id = body['fade']['href'].split('/')[-1]
+
+    # Wait for the action to complete
+    time.sleep(2.5)
+
+    code, body = http_request('GET', '/actions')
+    assert code == 200
+    assert len(body) == 1
+    assert len(body[0].keys()) == 1
+    assert body[0]['fade']['input']['brightness'] == 50
+    assert body[0]['fade']['input']['duration'] == 2000
+    assert body[0]['fade']['href'] == _PATH_PREFIX + '/actions/fade/' + action_id
+    assert re.match(_TIME_REGEX, body[0]['fade']['timeRequested']) is not None
+    assert re.match(_TIME_REGEX, body[0]['fade']['timeCompleted']) is not None
+    assert body[0]['fade']['status'] == 'completed'
+
+    code, body = http_request('GET', '/actions/fade')
+    assert code == 200
+    assert len(body) == 1
+    assert len(body[0].keys()) == 1
+    assert body[0]['fade']['input']['brightness'] == 50
+    assert body[0]['fade']['input']['duration'] == 2000
+    assert body[0]['fade']['href'] == _PATH_PREFIX + '/actions/fade/' + action_id
+    assert re.match(_TIME_REGEX, body[0]['fade']['timeRequested']) is not None
+    assert re.match(_TIME_REGEX, body[0]['fade']['timeCompleted']) is not None
+    assert body[0]['fade']['status'] == 'completed'
+
+    code, body = http_request('DELETE', '/actions/fade/' + action_id)
+    assert code == 204
+    assert body is None
 
     # Set up a websocket
     ws = websocket.WebSocket()
@@ -328,10 +396,10 @@ def run_client():
 
     code, body = http_request('GET', '/events')
     assert code == 200
-    assert len(body) == 2
-    assert len(body[1].keys()) == 1
-    assert body[1]['overheated']['data'] == 102
-    assert re.match(_TIME_REGEX, body[1]['overheated']['timestamp']) is not None
+    assert len(body) == 3
+    assert len(body[2].keys()) == 1
+    assert body[2]['overheated']['data'] == 102
+    assert re.match(_TIME_REGEX, body[2]['overheated']['timestamp']) is not None
 
     # Test event subscription through websocket
     ws.send(json.dumps({
@@ -427,6 +495,6 @@ if __name__ == '__main__':
 
     _PROTO = args.protocol
     _PATH_PREFIX = args.path_prefix
-    _AUTHORIATION_HEADER = args.auth_header
+    _AUTHORIZATION_HEADER = args.auth_header
 
     exit(run_client())
