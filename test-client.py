@@ -48,7 +48,13 @@ def http_request(method, path, data=None):
     url = url.rstrip('/')
 
     client = tornado.httpclient.HTTPClient()
+
+    fake_host = 'localhost'
+    if ':' in _BASE_URL:
+        fake_host += ':' + _BASE_URL.split(':')[1]
+
     headers = {
+        'Host': fake_host,
         'Accept': 'application/json',
     }
 
