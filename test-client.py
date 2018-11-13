@@ -121,7 +121,7 @@ def run_client():
     assert body['properties']['on']['href'] == _PATH_PREFIX + '/properties/on'
     assert body['properties']['brightness']['@type'] == 'BrightnessProperty'
     assert body['properties']['brightness']['label'] == 'Brightness'
-    assert body['properties']['brightness']['type'] == 'number'
+    assert body['properties']['brightness']['type'] == 'integer'
     assert body['properties']['brightness']['description'] == 'The level of light from 0-100'
     assert body['properties']['brightness']['minimum'] == 0
     assert body['properties']['brightness']['maximum'] == 100
@@ -130,16 +130,16 @@ def run_client():
     assert body['actions']['fade']['label'] == 'Fade'
     assert body['actions']['fade']['description'] == 'Fade the lamp to a given level'
     assert body['actions']['fade']['input']['type'] == 'object'
-    assert body['actions']['fade']['input']['properties']['brightness']['type'] == 'number'
+    assert body['actions']['fade']['input']['properties']['brightness']['type'] == 'integer'
     assert body['actions']['fade']['input']['properties']['brightness']['minimum'] == 0
     assert body['actions']['fade']['input']['properties']['brightness']['maximum'] == 100
     assert body['actions']['fade']['input']['properties']['brightness']['unit'] == 'percent'
-    assert body['actions']['fade']['input']['properties']['duration']['type'] == 'number'
+    assert body['actions']['fade']['input']['properties']['duration']['type'] == 'integer'
     assert body['actions']['fade']['input']['properties']['duration']['minimum'] == 1
     assert body['actions']['fade']['input']['properties']['duration']['unit'] == 'milliseconds'
     assert body['actions']['fade']['href'] == _PATH_PREFIX + '/actions/fade'
     assert body['events']['overheated']['type'] == 'number'
-    assert body['events']['overheated']['unit'] == 'celsius'
+    assert body['events']['overheated']['unit'] == 'degree celsius'
     assert body['events']['overheated']['description'] == 'The lamp has exceeded its safe operating temperature'
     assert body['events']['overheated']['href'] == _PATH_PREFIX + '/events/overheated'
     assert len(body['links']) >= 4
