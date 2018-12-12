@@ -115,13 +115,13 @@ def run_client():
     assert lists_equal(body['@type'], ['OnOffSwitch', 'Light'])
     assert body['description'] == 'A web connected lamp'
     assert body['properties']['on']['@type'] == 'OnOffProperty'
-    assert body['properties']['on']['label'] == 'On/Off'
+    assert body['properties']['on']['title'] == 'On/Off'
     assert body['properties']['on']['type'] == 'boolean'
     assert body['properties']['on']['description'] == 'Whether the lamp is turned on'
     assert len(body['properties']['on']['links']) == 1
     assert body['properties']['on']['links'][0]['href'] == _PATH_PREFIX + '/properties/on'
     assert body['properties']['brightness']['@type'] == 'BrightnessProperty'
-    assert body['properties']['brightness']['label'] == 'Brightness'
+    assert body['properties']['brightness']['title'] == 'Brightness'
     assert body['properties']['brightness']['type'] == 'integer'
     assert body['properties']['brightness']['description'] == 'The level of light from 0-100'
     assert body['properties']['brightness']['minimum'] == 0
@@ -129,7 +129,7 @@ def run_client():
     assert body['properties']['brightness']['unit'] == 'percent'
     assert len(body['properties']['brightness']['links']) == 1
     assert body['properties']['brightness']['links'][0]['href'] == _PATH_PREFIX + '/properties/brightness'
-    assert body['actions']['fade']['label'] == 'Fade'
+    assert body['actions']['fade']['title'] == 'Fade'
     assert body['actions']['fade']['description'] == 'Fade the lamp to a given level'
     assert body['actions']['fade']['input']['type'] == 'object'
     assert body['actions']['fade']['input']['properties']['brightness']['type'] == 'integer'
