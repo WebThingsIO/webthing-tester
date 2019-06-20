@@ -110,7 +110,7 @@ def run_client():
     # Test thing description
     code, body = http_request('GET', '/')
     assert code == 200
-    assert body['name'] == 'My Lamp'
+    assert body['title'] == 'My Lamp'
     assert body['@context'] == 'https://iot.mozilla.org/schemas'
     assert lists_equal(body['@type'], ['OnOffSwitch', 'Light'])
     assert body['description'] == 'A web connected lamp'
