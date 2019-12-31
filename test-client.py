@@ -16,6 +16,8 @@ _BASE_URL = None
 _PATH_PREFIX = None
 _AUTHORIZATION_HEADER = None
 _DEBUG = False
+_SKIP_ACTIONS_EVENTS = False
+_SKIP_WEBSOCKET = False
 
 
 def get_ip():
@@ -54,7 +56,7 @@ def http_request(method, path, data=None):
         fake_host += ':' + _BASE_URL.split(':')[1]
 
     headers = {
-        'Host': fake_host,
+        'Host': _BASE_URL,
         'Accept': 'application/json',
     }
 
@@ -62,7 +64,7 @@ def http_request(method, path, data=None):
         if data is None:
             print('Request:  {} {}'.format(method, url))
         else:
-            print('Request:  {} {}\n          '.format(method, url, data))
+            print('Request:  {} {}\n          {}'.format(method, url, data))
 
     if _AUTHORIZATION_HEADER is not None:
         headers['Authorization'] = _AUTHORIZATION_HEADER
@@ -110,7 +112,10 @@ def run_client():
     # Test thing description
     code, body = http_request('GET', '/')
     assert code == 200
+    #assert body['id'] == 'urn:dev:ops:my-lamp-1234'
     assert body['title'] == 'My Lamp'
+    assert body['security'] == 'nosec_sc'
+    assert body['securityDefinitions']['nosec_sc']['scheme'] == 'nosec'
     assert body['@context'] == 'https://iot.mozilla.org/schemas'
     assert lists_equal(body['@type'], ['OnOffSwitch', 'Light'])
     assert body['description'] == 'A web connected lamp'
@@ -129,41 +134,59 @@ def run_client():
     assert body['properties']['brightness']['unit'] == 'percent'
     assert len(body['properties']['brightness']['links']) == 1
     assert body['properties']['brightness']['links'][0]['href'] == _PATH_PREFIX + '/properties/brightness'
-    assert body['actions']['fade']['title'] == 'Fade'
-    assert body['actions']['fade']['description'] == 'Fade the lamp to a given level'
-    assert body['actions']['fade']['input']['type'] == 'object'
-    assert body['actions']['fade']['input']['properties']['brightness']['type'] == 'integer'
-    assert body['actions']['fade']['input']['properties']['brightness']['minimum'] == 0
-    assert body['actions']['fade']['input']['properties']['brightness']['maximum'] == 100
-    assert body['actions']['fade']['input']['properties']['brightness']['unit'] == 'percent'
-    assert body['actions']['fade']['input']['properties']['duration']['type'] == 'integer'
-    assert body['actions']['fade']['input']['properties']['duration']['minimum'] == 1
-    assert body['actions']['fade']['input']['properties']['duration']['unit'] == 'milliseconds'
-    assert len(body['actions']['fade']['links']) == 1
-    assert body['actions']['fade']['links'][0]['href'] == _PATH_PREFIX + '/actions/fade'
-    assert body['events']['overheated']['type'] == 'number'
-    assert body['events']['overheated']['unit'] == 'degree celsius'
-    assert body['events']['overheated']['description'] == 'The lamp has exceeded its safe operating temperature'
-    assert len(body['events']['overheated']['links']) == 1
-    assert body['events']['overheated']['links'][0]['href'] == _PATH_PREFIX + '/events/overheated'
-    assert len(body['links']) >= 4
-    assert body['links'][0]['rel'] == 'properties'
-    assert body['links'][0]['href'] == _PATH_PREFIX + '/properties'
-    assert body['links'][1]['rel'] == 'actions'
-    assert body['links'][1]['href'] == _PATH_PREFIX + '/actions'
-    assert body['links'][2]['rel'] == 'events'
-    assert body['links'][2]['href'] == _PATH_PREFIX + '/events'
-    assert body['links'][3]['rel'] == 'alternate'
 
-    ws_href = None
-    for link in body['links'][3:]:
-        if 'mediaType' in link:
-            assert link['mediaType'] == 'text/html'
-            assert link['href'] == _PATH_PREFIX
-        else:
-            proto = 'wss' if _PROTO == 'https' else 'ws'
-            assert re.match(proto + r'://[^/]+' + _PATH_PREFIX, link['href'])
-            ws_href = link['href']
+    if not _SKIP_ACTIONS_EVENTS:
+        assert body['actions']['fade']['title'] == 'Fade'
+        assert body['actions']['fade']['description'] == 'Fade the lamp to a given level'
+        assert body['actions']['fade']['input']['type'] == 'object'
+        assert body['actions']['fade']['input']['properties']['brightness']['type'] == 'integer'
+        assert body['actions']['fade']['input']['properties']['brightness']['minimum'] == 0
+        assert body['actions']['fade']['input']['properties']['brightness']['maximum'] == 100
+        assert body['actions']['fade']['input']['properties']['brightness']['unit'] == 'percent'
+        assert body['actions']['fade']['input']['properties']['duration']['type'] == 'integer'
+        assert body['actions']['fade']['input']['properties']['duration']['minimum'] == 1
+        assert body['actions']['fade']['input']['properties']['duration']['unit'] == 'milliseconds'
+        assert len(body['actions']['fade']['links']) == 1
+        assert body['actions']['fade']['links'][0]['href'] == _PATH_PREFIX + '/actions/fade'
+        assert body['events']['overheated']['type'] == 'number'
+        assert body['events']['overheated']['unit'] == 'degree celsius'
+        assert body['events']['overheated']['description'] == 'The lamp has exceeded its safe operating temperature'
+        assert len(body['events']['overheated']['links']) == 1
+        assert body['events']['overheated']['links'][0]['href'] == _PATH_PREFIX + '/events/overheated'
+
+    if _SKIP_ACTIONS_EVENTS:
+        assert len(body['links']) >= 1
+        assert body['links'][0]['rel'] == 'properties'
+        assert body['links'][0]['href'] == _PATH_PREFIX + '/properties'
+        remaining_links = body['links'][1:]
+    else:
+        assert len(body['links']) >= 3
+        assert body['links'][0]['rel'] == 'properties'
+        assert body['links'][0]['href'] == _PATH_PREFIX + '/properties'
+        assert body['links'][1]['rel'] == 'actions'
+        assert body['links'][1]['href'] == _PATH_PREFIX + '/actions'
+        assert body['links'][2]['rel'] == 'events'
+        assert body['links'][2]['href'] == _PATH_PREFIX + '/events'
+        remaining_links = body['links'][3:]
+
+    if not _SKIP_WEBSOCKET:
+        print(body['links'])
+        assert len(remaining_links) >= 1
+
+        ws_href = None
+        for link in remaining_links:
+            if link['rel'] != 'alternate':
+                continue
+
+            if 'mediaType' in link:
+                assert link['mediaType'] == 'text/html'
+                assert link['href'] == _PATH_PREFIX
+            else:
+                proto = 'wss' if _PROTO == 'https' else 'ws'
+                assert re.match(proto + r'://[^/]+' + _PATH_PREFIX, link['href'])
+                ws_href = link['href']
+
+        assert ws_href is not None
 
     # Test properties
     code, body = http_request('GET', '/properties')
@@ -183,124 +206,128 @@ def run_client():
     assert code == 200
     assert body['brightness'] == 25
 
-    # Test events
-    code, body = http_request('GET', '/events')
-    assert code == 200
-    assert len(body) == 0
+    if not _SKIP_ACTIONS_EVENTS:
+        # Test events
+        code, body = http_request('GET', '/events')
+        assert code == 200
+        assert len(body) == 0
 
-    # Test actions
-    code, body = http_request('GET', '/actions')
-    assert code == 200
-    assert len(body) == 0
+        # Test actions
+        code, body = http_request('GET', '/actions')
+        assert code == 200
+        assert len(body) == 0
 
-    code, body = http_request(
-        'POST',
-        '/actions',
-        {
-            'fade': {
-                'input': {
-                    'brightness': 50,
-                    'duration': 2000,
+        code, body = http_request(
+            'POST',
+            '/actions',
+            {
+                'fade': {
+                    'input': {
+                        'brightness': 50,
+                        'duration': 2000,
+                    },
                 },
-            },
-        })
-    assert code == 201
-    assert body['fade']['input']['brightness'] == 50
-    assert body['fade']['input']['duration'] == 2000
-    assert body['fade']['href'].startswith(_PATH_PREFIX + '/actions/fade/')
-    assert body['fade']['status'] == 'created'
-    action_id = body['fade']['href'].split('/')[-1]
+            })
+        assert code == 201
+        assert body['fade']['input']['brightness'] == 50
+        assert body['fade']['input']['duration'] == 2000
+        assert body['fade']['href'].startswith(_PATH_PREFIX + '/actions/fade/')
+        assert body['fade']['status'] == 'created'
+        action_id = body['fade']['href'].split('/')[-1]
 
-    # Wait for the action to complete
-    time.sleep(2.5)
+        # Wait for the action to complete
+        time.sleep(2.5)
 
-    code, body = http_request('GET', '/actions')
-    assert code == 200
-    assert len(body) == 1
-    assert len(body[0].keys()) == 1
-    assert body[0]['fade']['input']['brightness'] == 50
-    assert body[0]['fade']['input']['duration'] == 2000
-    assert body[0]['fade']['href'] == _PATH_PREFIX + '/actions/fade/' + action_id
-    assert re.match(_TIME_REGEX, body[0]['fade']['timeRequested']) is not None
-    assert re.match(_TIME_REGEX, body[0]['fade']['timeCompleted']) is not None
-    assert body[0]['fade']['status'] == 'completed'
+        code, body = http_request('GET', '/actions')
+        assert code == 200
+        assert len(body) == 1
+        assert len(body[0].keys()) == 1
+        assert body[0]['fade']['input']['brightness'] == 50
+        assert body[0]['fade']['input']['duration'] == 2000
+        assert body[0]['fade']['href'] == _PATH_PREFIX + '/actions/fade/' + action_id
+        assert re.match(_TIME_REGEX, body[0]['fade']['timeRequested']) is not None
+        assert re.match(_TIME_REGEX, body[0]['fade']['timeCompleted']) is not None
+        assert body[0]['fade']['status'] == 'completed'
 
-    code, body = http_request('GET', '/actions/fade')
-    assert code == 200
-    assert len(body) == 1
-    assert len(body[0].keys()) == 1
-    assert body[0]['fade']['input']['brightness'] == 50
-    assert body[0]['fade']['input']['duration'] == 2000
-    assert body[0]['fade']['href'] == _PATH_PREFIX + '/actions/fade/' + action_id
-    assert re.match(_TIME_REGEX, body[0]['fade']['timeRequested']) is not None
-    assert re.match(_TIME_REGEX, body[0]['fade']['timeCompleted']) is not None
-    assert body[0]['fade']['status'] == 'completed'
+        code, body = http_request('GET', '/actions/fade')
+        assert code == 200
+        assert len(body) == 1
+        assert len(body[0].keys()) == 1
+        assert body[0]['fade']['input']['brightness'] == 50
+        assert body[0]['fade']['input']['duration'] == 2000
+        assert body[0]['fade']['href'] == _PATH_PREFIX + '/actions/fade/' + action_id
+        assert re.match(_TIME_REGEX, body[0]['fade']['timeRequested']) is not None
+        assert re.match(_TIME_REGEX, body[0]['fade']['timeCompleted']) is not None
+        assert body[0]['fade']['status'] == 'completed'
 
-    code, body = http_request('DELETE', '/actions/fade/' + action_id)
-    assert code == 204
-    assert body is None
+        code, body = http_request('DELETE', '/actions/fade/' + action_id)
+        assert code == 204
+        assert body is None
 
-    # The action above generates an event, so check it.
-    code, body = http_request('GET', '/events')
-    assert code == 200
-    assert len(body) == 1
-    assert len(body[0].keys()) == 1
-    assert body[0]['overheated']['data'] == 102
-    assert re.match(_TIME_REGEX, body[0]['overheated']['timestamp']) is not None
+        # The action above generates an event, so check it.
+        code, body = http_request('GET', '/events')
+        assert code == 200
+        assert len(body) == 1
+        assert len(body[0].keys()) == 1
+        assert body[0]['overheated']['data'] == 102
+        assert re.match(_TIME_REGEX, body[0]['overheated']['timestamp']) is not None
 
-    code, body = http_request('GET', '/events/overheated')
-    assert code == 200
-    assert len(body) == 1
-    assert len(body[0].keys()) == 1
-    assert body[0]['overheated']['data'] == 102
-    assert re.match(_TIME_REGEX, body[0]['overheated']['timestamp']) is not None
+        code, body = http_request('GET', '/events/overheated')
+        assert code == 200
+        assert len(body) == 1
+        assert len(body[0].keys()) == 1
+        assert body[0]['overheated']['data'] == 102
+        assert re.match(_TIME_REGEX, body[0]['overheated']['timestamp']) is not None
 
-    code, body = http_request(
-        'POST',
-        '/actions/fade',
-        {
-            'fade': {
-                'input': {
-                    'brightness': 50,
-                    'duration': 2000,
+        code, body = http_request(
+            'POST',
+            '/actions/fade',
+            {
+                'fade': {
+                    'input': {
+                        'brightness': 50,
+                        'duration': 2000,
+                    },
                 },
-            },
-        })
-    assert code == 201
-    assert body['fade']['input']['brightness'] == 50
-    assert body['fade']['input']['duration'] == 2000
-    assert body['fade']['href'].startswith(_PATH_PREFIX + '/actions/fade/')
-    assert body['fade']['status'] == 'created'
-    action_id = body['fade']['href'].split('/')[-1]
+            })
+        assert code == 201
+        assert body['fade']['input']['brightness'] == 50
+        assert body['fade']['input']['duration'] == 2000
+        assert body['fade']['href'].startswith(_PATH_PREFIX + '/actions/fade/')
+        assert body['fade']['status'] == 'created'
+        action_id = body['fade']['href'].split('/')[-1]
 
-    # Wait for the action to complete
-    time.sleep(2.5)
+        # Wait for the action to complete
+        time.sleep(2.5)
 
-    code, body = http_request('GET', '/actions')
-    assert code == 200
-    assert len(body) == 1
-    assert len(body[0].keys()) == 1
-    assert body[0]['fade']['input']['brightness'] == 50
-    assert body[0]['fade']['input']['duration'] == 2000
-    assert body[0]['fade']['href'] == _PATH_PREFIX + '/actions/fade/' + action_id
-    assert re.match(_TIME_REGEX, body[0]['fade']['timeRequested']) is not None
-    assert re.match(_TIME_REGEX, body[0]['fade']['timeCompleted']) is not None
-    assert body[0]['fade']['status'] == 'completed'
+        code, body = http_request('GET', '/actions')
+        assert code == 200
+        assert len(body) == 1
+        assert len(body[0].keys()) == 1
+        assert body[0]['fade']['input']['brightness'] == 50
+        assert body[0]['fade']['input']['duration'] == 2000
+        assert body[0]['fade']['href'] == _PATH_PREFIX + '/actions/fade/' + action_id
+        assert re.match(_TIME_REGEX, body[0]['fade']['timeRequested']) is not None
+        assert re.match(_TIME_REGEX, body[0]['fade']['timeCompleted']) is not None
+        assert body[0]['fade']['status'] == 'completed'
 
-    code, body = http_request('GET', '/actions/fade')
-    assert code == 200
-    assert len(body) == 1
-    assert len(body[0].keys()) == 1
-    assert body[0]['fade']['input']['brightness'] == 50
-    assert body[0]['fade']['input']['duration'] == 2000
-    assert body[0]['fade']['href'] == _PATH_PREFIX + '/actions/fade/' + action_id
-    assert re.match(_TIME_REGEX, body[0]['fade']['timeRequested']) is not None
-    assert re.match(_TIME_REGEX, body[0]['fade']['timeCompleted']) is not None
-    assert body[0]['fade']['status'] == 'completed'
+        code, body = http_request('GET', '/actions/fade')
+        assert code == 200
+        assert len(body) == 1
+        assert len(body[0].keys()) == 1
+        assert body[0]['fade']['input']['brightness'] == 50
+        assert body[0]['fade']['input']['duration'] == 2000
+        assert body[0]['fade']['href'] == _PATH_PREFIX + '/actions/fade/' + action_id
+        assert re.match(_TIME_REGEX, body[0]['fade']['timeRequested']) is not None
+        assert re.match(_TIME_REGEX, body[0]['fade']['timeCompleted']) is not None
+        assert body[0]['fade']['status'] == 'completed'
 
-    code, body = http_request('DELETE', '/actions/fade/' + action_id)
-    assert code == 204
-    assert body is None
+        code, body = http_request('DELETE', '/actions/fade/' + action_id)
+        assert code == 204
+        assert body is None
+
+    if _SKIP_WEBSOCKET:
+        return
 
     # Set up a websocket
     ws = websocket.WebSocket()
@@ -308,6 +335,23 @@ def run_client():
         ws_href += '?jwt=' + _AUTHORIZATION_HEADER.split(' ')[1]
 
     ws.connect(ws_href)
+
+    if _DEBUG:
+        orig_send = ws.send
+        orig_recv = ws.recv
+
+        def send(msg):
+            print('WS Send: {}'.format(msg))
+            return orig_send(msg)
+
+        def recv():
+            msg = orig_recv()
+            print('WS Recv: {}'.format(msg))
+            return msg
+
+        ws.send = send
+        ws.recv = recv
+
 
     # Test setting property through websocket
     ws.send(json.dumps({
@@ -323,6 +367,9 @@ def run_client():
     code, body = http_request('GET', '/properties/brightness')
     assert code == 200
     assert body['brightness'] == 10
+
+    if _SKIP_ACTIONS_EVENTS:
+        return
 
     # Test requesting action through websocket
     ws.send(json.dumps({
@@ -483,6 +530,12 @@ if __name__ == '__main__':
                         default='')
     parser.add_argument('--auth-header',
                         help='authorization header, i.e. "Bearer ..."')
+    parser.add_argument('--skip-actions-events',
+                        help='skip action and event tests',
+                        action='store_true')
+    parser.add_argument('--skip-websocket',
+                        help='skip WebSocket tests',
+                        action='store_true')
     parser.add_argument('--debug',
                         help='log all requests',
                         action='store_true')
@@ -496,6 +549,12 @@ if __name__ == '__main__':
 
     if args.debug:
         _DEBUG = True
+
+    if args.skip_actions_events:
+        _SKIP_ACTIONS_EVENTS = True
+
+    if args.skip_websocket:
+        _SKIP_WEBSOCKET = True
 
     _PROTO = args.protocol
     _PATH_PREFIX = args.path_prefix
