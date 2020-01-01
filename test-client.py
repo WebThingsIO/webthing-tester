@@ -56,7 +56,7 @@ def http_request(method, path, data=None):
         fake_host += ':' + _BASE_URL.split(':')[1]
 
     headers = {
-        'Host': _BASE_URL,
+        'Host': fake_host,
         'Accept': 'application/json',
     }
 
@@ -112,7 +112,7 @@ def run_client():
     # Test thing description
     code, body = http_request('GET', '/')
     assert code == 200
-    #assert body['id'] == 'urn:dev:ops:my-lamp-1234'
+    assert body['id'] == 'urn:dev:ops:my-lamp-1234'
     assert body['title'] == 'My Lamp'
     assert body['security'] == 'nosec_sc'
     assert body['securityDefinitions']['nosec_sc']['scheme'] == 'nosec'
