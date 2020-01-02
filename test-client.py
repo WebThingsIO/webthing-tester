@@ -170,7 +170,6 @@ def run_client():
         remaining_links = body['links'][3:]
 
     if not _SKIP_WEBSOCKET:
-        print(body['links'])
         assert len(remaining_links) >= 1
 
         ws_href = None
