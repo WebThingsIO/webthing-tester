@@ -220,6 +220,24 @@ def run_client():
             'POST',
             '/actions',
             {
+                'fade': {},
+            })
+        assert code == 400
+
+        code, body = http_request(
+            'POST',
+            '/actions',
+            {
+                'fade': {
+                    'input': {},
+                },
+            })
+        assert code == 400
+
+        code, body = http_request(
+            'POST',
+            '/actions',
+            {
                 'fade': {
                     'input': {
                         'brightness': 50,
@@ -277,6 +295,24 @@ def run_client():
         assert len(body[0].keys()) == 1
         assert body[0]['overheated']['data'] == 102
         assert re.match(_TIME_REGEX, body[0]['overheated']['timestamp']) is not None
+
+        code, body = http_request(
+            'POST',
+            '/actions/fade',
+            {
+                'fade': {},
+            })
+        assert code == 400
+
+        code, body = http_request(
+            'POST',
+            '/actions/fade',
+            {
+                'fade': {
+                    'input': {},
+                },
+            })
+        assert code == 400
 
         code, body = http_request(
             'POST',
