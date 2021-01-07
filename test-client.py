@@ -116,7 +116,7 @@ def run_client():
     assert body['title'] == 'My Lamp'
     assert body['security'] == 'nosec_sc'
     assert body['securityDefinitions']['nosec_sc']['scheme'] == 'nosec'
-    assert body['@context'] == 'https://iot.mozilla.org/schemas'
+    assert body['@context'] == 'https://webthings.io/schemas'
     assert lists_equal(body['@type'], ['OnOffSwitch', 'Light'])
     assert body['description'] == 'A web connected lamp'
     assert body['properties']['on']['@type'] == 'OnOffProperty'
