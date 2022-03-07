@@ -107,24 +107,38 @@ def lists_equal(a, b):
     return len(intersection) == len(a)
 
 
+def check_property_value(body, prop, value):
+    if _FLAVOR == 'Webthings':
+        assert body[prop] == value
+    else:
+        assert body == value
+
+
 def run_client():
     """Test the web thing server."""
     # Test thing description
     code, body = http_request('GET', '/')
+
+    links_or_forms = 'links'
+    media_type = "mediaType"
+    if _FLAVOR == 'WoT':
+        links_or_forms = "forms"
+        media_type = "type"
+
     assert code == 200
     assert body['id'] == 'urn:dev:ops:my-lamp-1234'
     assert body['title'] == 'My Lamp'
     assert body['security'] == 'nosec_sc'
     assert body['securityDefinitions']['nosec_sc']['scheme'] == 'nosec'
-    assert body['@context'] == 'https://webthings.io/schemas'
+    # assert body['@context'] == 'https://webthings.io/schemas'
     assert lists_equal(body['@type'], ['OnOffSwitch', 'Light'])
     assert body['description'] == 'A web connected lamp'
     assert body['properties']['on']['@type'] == 'OnOffProperty'
     assert body['properties']['on']['title'] == 'On/Off'
     assert body['properties']['on']['type'] == 'boolean'
     assert body['properties']['on']['description'] == 'Whether the lamp is turned on'
-    assert len(body['properties']['on']['links']) == 1
-    assert body['properties']['on']['links'][0]['href'] == _PATH_PREFIX + '/properties/on'
+    assert len(body['properties']['on'][links_or_forms]) == 1
+    assert body['properties']['on'][links_or_forms][0]['href'] == _PATH_PREFIX + '/properties/on'
     assert body['properties']['brightness']['@type'] == 'BrightnessProperty'
     assert body['properties']['brightness']['title'] == 'Brightness'
     assert body['properties']['brightness']['type'] == 'integer'
@@ -132,8 +146,8 @@ def run_client():
     assert body['properties']['brightness']['minimum'] == 0
     assert body['properties']['brightness']['maximum'] == 100
     assert body['properties']['brightness']['unit'] == 'percent'
-    assert len(body['properties']['brightness']['links']) == 1
-    assert body['properties']['brightness']['links'][0]['href'] == _PATH_PREFIX + '/properties/brightness'
+    assert len(body['properties']['brightness'][links_or_forms]) == 1
+    assert body['properties']['brightness'][links_or_forms][0]['href'] == _PATH_PREFIX + '/properties/brightness'
 
     if not _SKIP_ACTIONS_EVENTS:
         assert body['actions']['fade']['title'] == 'Fade'
@@ -146,39 +160,43 @@ def run_client():
         assert body['actions']['fade']['input']['properties']['duration']['type'] == 'integer'
         assert body['actions']['fade']['input']['properties']['duration']['minimum'] == 1
         assert body['actions']['fade']['input']['properties']['duration']['unit'] == 'milliseconds'
-        assert len(body['actions']['fade']['links']) == 1
-        assert body['actions']['fade']['links'][0]['href'] == _PATH_PREFIX + '/actions/fade'
+        assert len(body['actions']['fade'][links_or_forms]) == 1
+        assert body['actions']['fade'][links_or_forms][0]['href'] == _PATH_PREFIX + '/actions/fade'
         assert body['events']['overheated']['type'] == 'number'
         assert body['events']['overheated']['unit'] == 'degree celsius'
         assert body['events']['overheated']['description'] == 'The lamp has exceeded its safe operating temperature'
-        assert len(body['events']['overheated']['links']) == 1
-        assert body['events']['overheated']['links'][0]['href'] == _PATH_PREFIX + '/events/overheated'
+        assert len(body['events']['overheated'][links_or_forms]) == 1
+        assert body['events']['overheated'][links_or_forms][0]['href'] == _PATH_PREFIX + '/events/overheated'
 
     if _SKIP_ACTIONS_EVENTS:
-        assert len(body['links']) >= 1
-        assert body['links'][0]['rel'] == 'properties'
-        assert body['links'][0]['href'] == _PATH_PREFIX + '/properties'
-        remaining_links = body['links'][1:]
+        assert len(body[links_or_forms]) >= 1
+        if _FLAVOR == 'Webthings':
+            assert body[links_or_forms][0]['rel'] == 'properties'
+        assert body[links_or_forms][0]['href'] == _PATH_PREFIX + '/properties'
+        remaining_links = body[links_or_forms][1:]
     else:
-        assert len(body['links']) >= 3
-        assert body['links'][0]['rel'] == 'properties'
-        assert body['links'][0]['href'] == _PATH_PREFIX + '/properties'
-        assert body['links'][1]['rel'] == 'actions'
-        assert body['links'][1]['href'] == _PATH_PREFIX + '/actions'
-        assert body['links'][2]['rel'] == 'events'
-        assert body['links'][2]['href'] == _PATH_PREFIX + '/events'
-        remaining_links = body['links'][3:]
+        assert len(body[links_or_forms]) >= 3
+        if _FLAVOR == 'Webthings':
+            assert body[links_or_forms][0]['rel'] == 'properties'
+        assert body[links_or_forms][0]['href'] == _PATH_PREFIX + '/properties'
+        if _FLAVOR == 'Webthings':
+            assert body[links_or_forms][1]['rel'] == 'actions'
+        assert body[links_or_forms][1]['href'] == _PATH_PREFIX + '/actions'
+        if _FLAVOR == 'Webthings':
+            assert body[links_or_forms][2]['rel'] == 'events'
+        assert body[links_or_forms][2]['href'] == _PATH_PREFIX + '/events'
+        remaining_links = body[links_or_forms][3:]
 
     if not _SKIP_WEBSOCKET:
         assert len(remaining_links) >= 1
 
         ws_href = None
         for link in remaining_links:
-            if link['rel'] != 'alternate':
+            if 'rel' in link and link['rel'] != 'alternate':
                 continue
 
-            if 'mediaType' in link:
-                assert link['mediaType'] == 'text/html'
+            if media_type in link:
+                assert link[media_type] == 'text/html'
                 assert link['href'] == _PATH_PREFIX
             else:
                 proto = 'wss' if _PROTO == 'https' else 'ws'
@@ -189,21 +207,23 @@ def run_client():
 
     # Test properties
     code, body = http_request('GET', '/properties')
-    assert code == 200
     assert body['brightness'] == 50
     assert body['on']
 
     code, body = http_request('GET', '/properties/brightness')
     assert code == 200
-    assert body['brightness'] == 50
+    check_property_value(body, "brightness", 50)
 
-    code, body = http_request('PUT', '/properties/brightness', {'brightness': 25})
+    value = 25 if _FLAVOR == "WoT" else {'brightness': 25}
+
+
+    code, body = http_request('PUT', '/properties/brightness', value)
     assert code == 200
-    assert body['brightness'] == 25
+    check_property_value(body, 'brightness', 25)
 
     code, body = http_request('GET', '/properties/brightness')
     assert code == 200
-    assert body['brightness'] == 25
+    check_property_value(body, 'brightness', 25)
 
     if not _SKIP_ACTIONS_EVENTS:
         # Test events
@@ -401,7 +421,7 @@ def run_client():
 
     code, body = http_request('GET', '/properties/brightness')
     assert code == 200
-    assert body['brightness'] == 10
+    check_property_value(body, 'brightness', 10)
 
     if _SKIP_ACTIONS_EVENTS:
         return
@@ -574,6 +594,10 @@ if __name__ == '__main__':
     parser.add_argument('--debug',
                         help='log all requests',
                         action='store_true')
+    parser.add_argument('--flavor',
+                        help='specify the protocol flavor',
+                        choices=['WoT', 'Webthings'],
+                        default='Webthings')
     args = parser.parse_args()
 
     if (args.protocol == 'http' and args.port == 80) or \
@@ -594,5 +618,6 @@ if __name__ == '__main__':
     _PROTO = args.protocol
     _PATH_PREFIX = args.path_prefix
     _AUTHORIZATION_HEADER = args.auth_header
+    _FLAVOR = args.flavor
 
     exit(run_client())
