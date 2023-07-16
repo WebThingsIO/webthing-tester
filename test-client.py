@@ -565,6 +565,9 @@ if __name__ == '__main__':
                         default='')
     parser.add_argument('--auth-header',
                         help='authorization header, i.e. "Bearer ..."')
+    parser.add_argument('--time-regex',
+                        help='regex for matching timestamps',
+                        default=_TIME_REGEX)                        
     parser.add_argument('--skip-actions-events',
                         help='skip action and event tests',
                         action='store_true')
@@ -594,5 +597,6 @@ if __name__ == '__main__':
     _PROTO = args.protocol
     _PATH_PREFIX = args.path_prefix
     _AUTHORIZATION_HEADER = args.auth_header
+    _TIME_REGEX = args.time_regex
 
     exit(run_client())
